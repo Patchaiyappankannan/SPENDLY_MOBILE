@@ -1,0 +1,44 @@
+{
+  "expo": {
+    "name": "Spendly",
+    "slug": "spendly",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "android": {
+      "package": "com.yourcompany.spendly",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-foreground.png",
+        "backgroundColor": "#14213D"
+      }
+    },
+    "ios": {
+      "bundleIdentifier": "com.yourcompany.spendly"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-sqlite",
+      "expo-secure-store",
+      "expo-notifications",
+      [
+        "expo-splash-screen",
+        {
+          "image": "./assets/splash-icon.png",
+          "backgroundColor": "#14213D",
+          "imageWidth": 200
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1a7de7c3-34e9-4037-a3fd-6578aad99979"
+      }
+    },
+    "owner": "patchaiyappanask"
+  }
+}

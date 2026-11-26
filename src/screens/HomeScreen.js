@@ -1,0 +1,127 @@
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, Pressable, RefreshControl } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { useFocusEffect } from '@react-navigation/native';
+import { Screen, Card, Muted, SectionHeader, ProgressBar, EmptyState, FAB } from '../components/ui';
+import MonthSwitcher from '../components/MonthSwitcher';
+import TxRow from '../components/TxRow';
+import { useTheme } from '../theme/ThemeContext';
+import { useAuth } from '../context/AuthContext';
+import { useSync } from '../context/SyncContext';
+import { font, radius, spacing } from '../theme/tokens';
+import { formatMoney, monthKey, daysInMonth } from '../utils/format';
+import { monthSummary, listByMonth } from '../repositories/txRepo';
+import { getBudget } from '../repositories/budgetRepo';
+
+export default function HomeScreen({ navigation }) {
+  const { c, currency } = useTheme();
+  const { user } = useAuth();
+  const { pending, syncing, version, syncNow } = useSync();
+  const [month, setMonth] = useState(monthKey(new Date()));
+  const [sum, setSum] = useState({ income: 0, expense: 0 });
+  const [budget, setBudget] = useState(null);
+  const [recent, setRecent] = useState([]);
+
+  const load = useCallback(async () => {
+    setSum(await monthSummary(month));
+    setBudget(await getBudget(month));
+    setRecent((await listByMonth(month)).slice(0, 6));
+  }, [month]);
+
+  useFocusEffect(useCallback(() => { load(); }, [load, version]));
+
+  const balance = sum.income - sum.expense;
+  const isCurrent = month === monthKey(new Date());
+  const spentPct = budget ? (sum.expense / budget) * 100 : 0;
+  const remaining = budget ? budget - sum.expense : 0;
+  const daysLeft = daysInMonth(month) - new Date().getDate() + 1;
+  const safeToday = budget && isCurrent && remaining > 0 ? remaining / daysLeft : 0;
+  const barColor = spentPct >= 100 ? c.expense : spentPct >= 80 ? c.accent : c.income;
+  const first = (user?.name || '').split(' ')[0];
+
+  const Stat = ({ icon, label, value }) => (
+    <View style={{ flex: 1, backgroundColor: c.heroChip, borderRadius: radius.md, padding: 12 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+        <Ionicons name={icon} size={14} color={c.heroMuted} />
+        <Text style={{ color: c.heroMuted, fontSize: font.xs }}>{label}</Text>
+      </View>
+      <Text style={{ color: c.heroText, fontSize: font.lg, fontWeight: '700', marginTop: 4 }}>{formatMoney(value, currency)}</Text>
+    </View>
+  );
+
+  return (
+    <Screen>
+      <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 110 }}
+        refreshControl={<RefreshControl refreshing={syncing} onRefresh={syncNow} tintColor={c.primary} />}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+          <View>
+            <Muted>Welcome back</Muted>
+            <Text style={{ color: c.text, fontSize: font.xl, fontWeight: '700' }}>{first || 'there'}</Text>
+          </View>
+          <Pressable onPress={syncNow} style={{
+            flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 12, height: 34, borderRadius: radius.pill,
+            backgroundColor: pending ? c.accentSoft : c.incomeSoft,
+          }}>
+            <Ionicons name={syncing ? 'sync' : pending ? 'time-outline' : 'cloud-done-outline'} size={16} color={pending ? c.accent : c.income} />
+            <Text style={{ color: pending ? c.accent : c.income, fontSize: font.xs, fontWeight: '700' }}>
+              {syncing ? 'Syncing' : pending ? `${pending} to sync` : 'Backed up'}
+            </Text>
+          </Pressable>
+        </View>
+
+        <MonthSwitcher month={month} onChange={setMonth} />
+
+        <View style={{ backgroundColor: c.hero, borderRadius: radius.xl, padding: 20 }}>
+          <Text style={{ color: c.heroMuted, fontSize: font.sm }}>Net balance this month</Text>
+          <Text style={{ color: c.heroText, fontSize: font.xxl + 4, fontWeight: '800', marginTop: 4, marginBottom: 16 }}>
+            {formatMoney(balance, currency)}
+          </Text>
+          <View style={{ flexDirection: 'row', gap: 10 }}>
+            <Stat icon="arrow-down-circle-outline" label="Income" value={sum.income} />
+            <Stat icon="arrow-up-circle-outline" label="Spent" value={sum.expense} />
+          </View>
+        </View>
+
+        <Card style={{ marginTop: spacing.lg }}>
+          {budget ? (
+            <>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 10 }}>
+                <Text style={{ color: c.text, fontWeight: '700', fontSize: font.md }}>Monthly budget</Text>
+                <Muted>{formatMoney(sum.expense, currency)} of {formatMoney(budget, currency)}</Muted>
+              </View>
+              <ProgressBar pct={spentPct} color={barColor} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 10 }}>
+                <Text style={{ color: remaining < 0 ? c.expense : c.textMuted, fontSize: font.sm }}>
+                  {remaining < 0 ? `Over by ${formatMoney(-remaining, currency)}` : `${formatMoney(remaining, currency)} left`}
+                </Text>
+                {safeToday > 0 ? <Text style={{ color: c.text, fontSize: font.sm, fontWeight: '600' }}>Safe to spend today: {formatMoney(safeToday, currency)}</Text> : null}
+              </View>
+            </>
+          ) : (
+            <Pressable onPress={() => navigation.navigate('Settings')} style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Ionicons name="flag-outline" size={22} color={c.accent} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: c.text, fontWeight: '700', fontSize: font.md }}>Set a monthly budget</Text>
+                <Muted>Get a daily safe-to-spend amount and a warning at 80%.</Muted>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
+            </Pressable>
+          )}
+        </Card>
+
+        <SectionHeader title="Recent" action={recent.length ? 'See all' : undefined} onAction={() => navigation.navigate('Transactions')} />
+        <Card style={{ paddingVertical: 4 }}>
+          {recent.length ? recent.map((t, i) => (
+            <View key={t.local_id} style={{ borderTopWidth: i ? 1 : 0, borderTopColor: c.border }}>
+              <TxRow item={t} showDate onPress={() => navigation.navigate('AddTransaction', { id: t.local_id })} />
+            </View>
+          )) : (
+            <EmptyState title="No entries yet" hint="Add your first expense. It works even without internet."
+              actionTitle="Add expense" onAction={() => navigation.navigate('AddTransaction')} />
+          )}
+        </Card>
+      </ScrollView>
+      <FAB onPress={() => navigation.navigate('AddTransaction')} />
+    </Screen>
+  );
+}
