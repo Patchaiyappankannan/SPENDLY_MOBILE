@@ -19,7 +19,7 @@ export default function AuthScreen() {
 
   const submit = async () => {
     setError('');
-    if (register && !name.trim()) return setError('Enter your name');
+    if (register && !name.trim()) return setError('Enter Enter Your Full Name');
     if (!email.trim() || !password) return setError('Enter your email and password');
     if (register && password.length < 6) return setError('Password must be at least 6 characters');
     setBusy(true);
@@ -45,11 +45,11 @@ export default function AuthScreen() {
             </Muted>
           </View>
 
-          {register ? <Input label="Name" icon="person-outline" value={name} onChangeText={setName} placeholder="Your name" /> : null}
-          <Input label="Email" icon="mail-outline" value={email} onChangeText={setEmail} placeholder="you@example.com"
+          {register ? <Input label="Name" icon="person-outline" value={name} onChangeText={setName} placeholder="Enter Your Full Name" /> : null}
+          <Input label="Email" icon="mail-outline" value={email} onChangeText={setEmail} placeholder="Enter Your Email "
             autoCapitalize="none" keyboardType="email-address" />
           <Input label="Password" icon="lock-closed-outline" value={password} onChangeText={setPassword}
-            placeholder={register ? 'At least 6 characters' : 'Your password'} secureTextEntry={!passwordVisible}
+            placeholder={register ? 'At least 6 characters' : 'Enter Your Password'} secureTextEntry={!passwordVisible}
             rightIcon={passwordVisible ? 'eye-off-outline' : 'eye-outline'}
             rightIconLabel={passwordVisible ? 'Hide password' : 'Show password'}
             onRightIconPress={() => setPasswordVisible((visible) => !visible)} />

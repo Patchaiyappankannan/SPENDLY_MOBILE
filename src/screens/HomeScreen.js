@@ -18,15 +18,16 @@ export default function HomeScreen({ navigation }) {
   const { user } = useAuth();
   const { pending, syncing, version, syncNow } = useSync();
   const [month, setMonth] = useState(monthKey(new Date()));
+  const [date, setDate] = useState(null);
   const [sum, setSum] = useState({ income: 0, expense: 0 });
   const [budget, setBudget] = useState(null);
   const [recent, setRecent] = useState([]);
 
   const load = useCallback(async () => {
-    setSum(await monthSummary(month));
+    setSum(await monthSummary(month, date));
     setBudget(await getBudget(month));
-    setRecent((await listByMonth(month)).slice(0, 6));
-  }, [month]);
+    setRecent((await listByMonth(month, { date })).slice(0, 6));
+  }, [month, date]);
 
   useFocusEffect(useCallback(() => { load(); }, [load, version]));
 
@@ -69,7 +70,7 @@ export default function HomeScreen({ navigation }) {
           </Pressable>
         </View>
 
-        <MonthSwitcher month={month} onChange={setMonth} />
+        <MonthSwitcher month={month} onChange={setMonth} date={date} onDateChange={setDate} />
 
         <View style={{ backgroundColor: c.hero, borderRadius: radius.xl, padding: 20 }}>
           <Text style={{ color: c.heroMuted, fontSize: font.sm }}>Net balance this month</Text>

@@ -37,7 +37,7 @@ export default function TransactionsScreen({ navigation }) {
     <Screen>
       <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.sm }}>
         <Title>Transactions</Title>
-        <MonthSwitcher month={month} onChange={setMonth} />
+        <MonthSwitcher month={month} onChange={setMonth} showCalendar={false} />
         <Input icon="search" placeholder="Search note or category" value={search} onChangeText={setSearch}
           containerStyle={{ marginBottom: spacing.md }} />
         <Segmented value={type} onChange={setType} style={{ marginBottom: spacing.sm }}

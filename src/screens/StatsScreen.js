@@ -1,5 +1,6 @@
 import React, { useCallback, useState } from 'react';
 import { View, Text, ScrollView } from 'react-native';
+import Svg, { Circle, Path } from 'react-native-svg';
 import { useFocusEffect } from '@react-navigation/native';
 import { Screen, Title, Card, Segmented, Muted, SectionHeader, IconBadge, ProgressBar, EmptyState } from '../components/ui';
 import MonthSwitcher from '../components/MonthSwitcher';
@@ -14,27 +15,54 @@ export default function StatsScreen() {
   const { c, currency } = useTheme();
   const { version } = useSync();
   const [month, setMonth] = useState(monthKey(new Date()));
+  const [date, setDate] = useState(null);
   const [type, setType] = useState('expense');
   const [cats, setCats] = useState([]);
   const [daily, setDaily] = useState([]);
   const [trend, setTrend] = useState([]);
 
   const load = useCallback(async () => {
-    setCats(await categoryTotals(month, type));
-    setDaily(await dailyTotals(month, type));
+    setCats(await categoryTotals(month, type, date));
+    setDaily(await dailyTotals(month, type, date));
     setTrend(await monthlyTotals(month, 6));
-  }, [month, type]);
+  }, [month, type, date]);
   useFocusEffect(useCallback(() => { load(); }, [load, version]));
 
   const total = cats.reduce((s, r) => s + r.total, 0);
-  const max = Math.max(1, ...trend.flatMap((t) => [t.income, t.expense]));
-  const H = 110;
+
+  const donutSize = 180;
+  const radius = 68;
+  const circumference = 2 * Math.PI * radius;
+  let segmentOffset = 0;
+
+  const waveWidth = 300;
+  const waveHeight = 120;
+  const wavePadding = 8;
+  const maxWave = Math.max(1, ...trend.flatMap((item) => [item.income, item.expense]));
+  const wavePoint = (value, index) => {
+    const x = wavePadding + (index * (waveWidth - wavePadding * 2)) / Math.max(1, trend.length - 1);
+    const y = waveHeight - wavePadding - (value / maxWave) * (waveHeight - wavePadding * 2);
+    return [x, y];
+  };
+  const wavePath = (values) => {
+    if (!values.length) return '';
+    const points = values.map((value, index) => wavePoint(value, index));
+    if (points.length === 1) return `M ${points[0][0]} ${points[0][1]}`;
+    let path = `M ${points[0][0]} ${points[0][1]}`;
+    for (let i = 1; i < points.length; i++) {
+      const [x0, y0] = points[i - 1];
+      const [x1, y1] = points[i];
+      const middle = (x0 + x1) / 2;
+      path += ` C ${middle} ${y0}, ${middle} ${y1}, ${x1} ${y1}`;
+    }
+    return path;
+  };
 
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ padding: spacing.lg, paddingBottom: 40 }}>
         <Title>Insights</Title>
-        <MonthSwitcher month={month} onChange={setMonth} />
+        <MonthSwitcher month={month} onChange={setMonth} date={date} onDateChange={setDate} />
         <Segmented value={type} onChange={setType} options={[{ key: 'expense', label: 'Expenses' }, { key: 'income', label: 'Income' }]} />
 
         <SectionHeader title={type === 'expense' ? 'Where your money went' : 'Monthly income'} />
@@ -47,6 +75,29 @@ export default function StatsScreen() {
           ) : null}
           {cats.length ? (
             <>
+              <View style={{ alignItems: 'center', marginTop: spacing.sm, marginBottom: spacing.md }}>
+                <View style={{ width: donutSize, height: donutSize, alignItems: 'center', justifyContent: 'center' }}>
+                  <Svg width={donutSize} height={donutSize} viewBox={`0 0 ${donutSize} ${donutSize}`}>
+                    <Circle cx={donutSize / 2} cy={donutSize / 2} r={radius} fill="none" stroke={c.surfaceAlt} strokeWidth="18" />
+                    {cats.map((item) => {
+                      const meta = catMeta(type, item.category);
+                      const segment = total ? (item.total / total) * circumference : 0;
+                      const offset = segmentOffset;
+                      segmentOffset += segment;
+                      return (
+                        <Circle key={item.category} cx={donutSize / 2} cy={donutSize / 2} r={radius}
+                          fill="none" stroke={meta.color} strokeWidth="18" strokeLinecap="round"
+                          strokeDasharray={`${segment} ${circumference - segment}`} strokeDashoffset={-offset}
+                          transform={`rotate(-90 ${donutSize / 2} ${donutSize / 2})`} />
+                      );
+                    })}
+                  </Svg>
+                  <View style={{ position: 'absolute', alignItems: 'center' }}>
+                    <Text style={{ color: c.text, fontSize: font.xl, fontWeight: '800' }}>{formatMoney(total, currency)}</Text>
+                    <Muted>{type === 'expense' ? 'Spent' : 'Income'}</Muted>
+                  </View>
+                </View>
+              </View>
               {type === 'expense' ? (
                 <>
                   <Text style={{ color: c.text, fontSize: font.xl, fontWeight: '800' }}>{formatMoney(total, currency)}</Text>
@@ -93,18 +144,22 @@ export default function StatsScreen() {
 
         <SectionHeader title="Last 6 months" />
         <Card>
-          <View style={{ flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', height: H + 24 }}>
-            {trend.map((t) => (
-              <View key={t.month} style={{ alignItems: 'center', flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'flex-end', height: H, gap: 4 }}>
-                  <View style={{ width: 12, height: Math.max(3, (t.income / max) * H), backgroundColor: c.income, borderRadius: 4 }} />
-                  <View style={{ width: 12, height: Math.max(3, (t.expense / max) * H), backgroundColor: c.expense, borderRadius: 4 }} />
-                </View>
-                <Text style={{ color: t.month === month ? c.text : c.textMuted, fontSize: font.xs, fontWeight: t.month === month ? '700' : '400', marginTop: 6 }}>
-                  {monthShort(t.month)}
+          <View style={{ height: waveHeight + 24, alignItems: 'center' }}>
+            <Svg width={waveWidth} height={waveHeight} viewBox={`0 0 ${waveWidth} ${waveHeight}`}>
+              {[0, 1, 2, 3].map((line) => {
+                const y = wavePadding + (line * (waveHeight - wavePadding * 2)) / 3;
+                return <Path key={line} d={`M ${wavePadding} ${y} H ${waveWidth - wavePadding}`} stroke={c.border} strokeWidth="1" />;
+              })}
+              <Path d={wavePath(trend.map((item) => item.income))} fill="none" stroke={c.income} strokeWidth="3" strokeLinecap="round" />
+              <Path d={wavePath(trend.map((item) => item.expense))} fill="none" stroke={c.expense} strokeWidth="3" strokeLinecap="round" />
+            </Svg>
+            <View style={{ width: waveWidth, flexDirection: 'row', justifyContent: 'space-between' }}>
+              {trend.map((item) => (
+                <Text key={item.month} style={{ color: item.month === month ? c.text : c.textMuted, fontSize: font.xs, fontWeight: item.month === month ? '700' : '400' }}>
+                  {monthShort(item.month)}
                 </Text>
-              </View>
-            ))}
+              ))}
+            </View>
           </View>
           <View style={{ flexDirection: 'row', gap: 16, marginTop: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>

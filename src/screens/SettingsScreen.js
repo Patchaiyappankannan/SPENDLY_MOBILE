@@ -5,6 +5,7 @@ import DateTimePicker from '@react-native-community/datetimepicker';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { Screen, Title, Card, Muted, SectionHeader, Input, Button, Chip, Segmented } from '../components/ui';
+import MonthSwitcher from '../components/MonthSwitcher';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
@@ -23,6 +24,7 @@ export default function SettingsScreen() {
   const { user, signOut, updateName } = useAuth();
   const { pending, syncing, lastSync, error, syncNow, changed } = useSync();
   const [name, setName] = useState(user?.name || '');
+  const [budgetMonth, setBudgetMonth] = useState(monthKey(new Date()));
   const [budget, setBudgetText] = useState('');
   const [remind, setRemind] = useState(false);
   const [hour, setHour] = useState(21);
@@ -33,13 +35,20 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     (async () => {
-      const b = await getBudget(monthKey(new Date()));
-      setBudgetText(b ? String(b) : '');
       setRemind((await getSetting('reminder_on', '0')) === '1');
       setHour(Number(await getSetting('reminder_hour', '21')));
       setMinute(Number(await getSetting('reminder_minute', '0')));
     })();
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const b = await getBudget(budgetMonth);
+      if (active) setBudgetText(b ? String(b) : '');
+    })();
+    return () => { active = false; };
+  }, [budgetMonth]);
 
   useEffect(() => {
     let active = true;
@@ -54,19 +63,32 @@ export default function SettingsScreen() {
     return () => { active = false; };
   }, []);
 
-  const saveName = async () => { if (name.trim() && name.trim() !== user.name) { await updateName(name.trim()); Alert.alert('Saved', 'Your name was updated.'); } };
+  const saveName = async () => { if (name.trim() && name.trim() !== user.name) { await updateName(name.trim()); Alert.alert('Saved', 'Enter Your Full Name was updated.'); } };
 
-  const chooseProfilePhoto = async () => {
+  const processProfilePhoto = async (source) => {
     setPhotoBusy(true);
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        Alert.alert('Photo access needed', 'Allow photo library access to choose a profile photo.');
-        return;
+      let result;
+      if (source === 'camera') {
+        const permission = await ImagePicker.requestCameraPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Camera access needed', 'Allow camera access to take a profile photo.');
+          return;
+        }
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
+        });
+      } else {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!permission.granted) {
+          Alert.alert('Photo access needed', 'Allow photo library access to choose a profile photo.');
+          return;
+        }
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
+        });
       }
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'], allowsEditing: true, aspect: [1, 1], quality: 0.8,
-      });
+
       if (result.canceled) return;
 
       const saved = await ImageManipulator.manipulateAsync(
@@ -89,12 +111,20 @@ export default function SettingsScreen() {
     }
   };
 
+  const chooseProfilePhoto = () => {
+    Alert.alert('Change profile photo', 'Choose a photo source', [
+      { text: 'Camera', onPress: () => processProfilePhoto('camera') },
+      { text: 'Gallery', onPress: () => processProfilePhoto('gallery') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   const saveBudget = async () => {
     const v = parseFloat(budget);
     if (!v || v <= 0) return Alert.alert('Enter a budget', 'Type a monthly amount greater than zero.');
-    await setBudget(monthKey(new Date()), v);
+    await setBudget(budgetMonth, v);
     changed();
-    Alert.alert('Budget saved', 'It applies to this month and carries forward until you change it.');
+    Alert.alert('Budget saved', 'This budget applies to the selected month.');
   };
 
   const toggleRemind = async (on) => {
@@ -175,6 +205,7 @@ export default function SettingsScreen() {
 
         <SectionHeader title="Budget" />
         <Card>
+          <MonthSwitcher month={budgetMonth} onChange={setBudgetMonth} showCalendar={false} />
           <Input label="Monthly budget" value={budget} onChangeText={(t) => setBudgetText(t.replace(/[^0-9.]/g, ''))}
             keyboardType="decimal-pad" icon="flag-outline" placeholder="e.g. 30000" containerStyle={{ marginBottom: spacing.md }} />
           <Button title="Save budget" variant="secondary" onPress={saveBudget} />

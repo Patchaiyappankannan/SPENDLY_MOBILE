@@ -39,41 +39,41 @@ export async function getTx(id) {
   return db.getFirstAsync('SELECT * FROM transactions WHERE user_id=? AND local_id=?', userId, id);
 }
 
-export async function listByMonth(month, { type, search } = {}) {
+export async function listByMonth(month, { type, search, date } = {}) {
   const db = await getDb();
   const userId = getActiveUserId();
-  let sql = `SELECT * FROM transactions WHERE user_id=? AND deleted=0 AND date LIKE ?`;
-  const args = [userId, month + '%'];
+  let sql = `SELECT * FROM transactions WHERE user_id=? AND deleted=0 AND date ${date ? '= ?' : 'LIKE ?'}`;
+  const args = [userId, date || month + '%'];
   if (type) { sql += ' AND type=?'; args.push(type); }
   if (search) { sql += ' AND (note LIKE ? OR category LIKE ?)'; args.push(`%${search}%`, `%${search}%`); }
   sql += ' ORDER BY date DESC, updated_at DESC';
   return db.getAllAsync(sql, ...args);
 }
 
-export async function monthSummary(month) {
+export async function monthSummary(month, date = null) {
   const db = await getDb();
   const userId = getActiveUserId();
   const rows = await db.getAllAsync(
-    `SELECT type, SUM(amount) AS total FROM transactions WHERE user_id=? AND deleted=0 AND date LIKE ? GROUP BY type`, userId, month + '%');
+    `SELECT type, SUM(amount) AS total FROM transactions WHERE user_id=? AND deleted=0 AND date ${date ? '= ?' : 'LIKE ?'} GROUP BY type`, userId, date || month + '%');
   const out = { income: 0, expense: 0 };
   rows.forEach((r) => { out[r.type] = r.total || 0; });
   return out;
 }
 
-export async function categoryTotals(month, type = 'expense') {
+export async function categoryTotals(month, type = 'expense', date = null) {
   const db = await getDb();
   const userId = getActiveUserId();
   return db.getAllAsync(
     `SELECT category, SUM(amount) AS total, COUNT(*) AS n FROM transactions
-      WHERE user_id=? AND deleted=0 AND type=? AND date LIKE ? GROUP BY category ORDER BY total DESC`, userId, type, month + '%');
+      WHERE user_id=? AND deleted=0 AND type=? AND date ${date ? '= ?' : 'LIKE ?'} GROUP BY category ORDER BY total DESC`, userId, type, date || month + '%');
 }
 
-export async function dailyTotals(month, type = 'income') {
+export async function dailyTotals(month, type = 'income', date = null) {
   const db = await getDb();
   const userId = getActiveUserId();
   return db.getAllAsync(
     `SELECT date, SUM(amount) AS total, COUNT(*) AS n FROM transactions
-      WHERE user_id=? AND deleted=0 AND type=? AND date LIKE ? GROUP BY date ORDER BY date DESC`, userId, type, month + '%');
+      WHERE user_id=? AND deleted=0 AND type=? AND date ${date ? '= ?' : 'LIKE ?'} GROUP BY date ORDER BY date DESC`, userId, type, date || month + '%');
 }
 
 export async function monthlyTotals(endMonth = monthKey(new Date()), count = 6) {
