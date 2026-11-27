@@ -7,14 +7,14 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "android": {
-      "package": "com.yourcompany.spendly",
+      "package": "com.patchaiyappan.spendly",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-foreground.png",
         "backgroundColor": "#14213D"
       }
     },
     "ios": {
-      "bundleIdentifier": "com.yourcompany.spendly"
+      "bundleIdentifier": "com.patchaiyappan.spendly"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -40,7 +40,8 @@
           "photosPermission": "Allow Spendly to access your photos for your profile photo.",
           "microphonePermission": false
         }
-      ]
+      ],
+      "expo-build-properties"
     ],
     "extra": {
       "eas": {
