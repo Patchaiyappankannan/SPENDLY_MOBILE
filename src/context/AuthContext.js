@@ -2,7 +2,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import * as SecureStore from 'expo-secure-store';
 import { request, getToken, setToken } from '../services/api';
 import { setActiveUserId } from '../services/activeUser';
-import { getSetting } from '../repositories/settingsRepo';
+import { getUserPreferences } from '../repositories/preferencesRepo';
 import { cancelReminders, enableDailyReminder } from '../services/notifications';
 
 const Ctx = createContext(null);
@@ -31,10 +31,12 @@ export function AuthProvider({ children }) {
     if (!user) return;
     (async () => {
       try {
-        if ((await getSetting('reminder_on', '0')) !== '1') return;
-        const hour = Number(await getSetting('reminder_hour', '21'));
-        const minute = Number(await getSetting('reminder_minute', '0'));
-        await enableDailyReminder(hour, minute);
+        const preferences = await getUserPreferences(user.id);
+        if (!preferences.dailyReminderEnabled) {
+          await cancelReminders();
+          return;
+        }
+        await enableDailyReminder(preferences.dailyReminderHour, preferences.dailyReminderMinute);
       } catch {}
     })();
   }, [user]);
@@ -67,6 +69,14 @@ export function AuthProvider({ children }) {
     try { await request('/auth/profile', { method: 'PUT', body: { name } }); } catch {}
   };
 
-  return <Ctx.Provider value={{ user, loading, signIn, signUp, signOut, updateName }}>{children}</Ctx.Provider>;
+  const updateEmail = async (email, password) => {
+    const result = await request('/auth/profile/email', { method: 'PUT', body: { email, password } });
+    const updatedUser = { ...user, email: result.email };
+    setUser(updatedUser);
+    await SecureStore.setItemAsync('user', JSON.stringify(updatedUser));
+    return updatedUser.email;
+  };
+
+  return <Ctx.Provider value={{ user, loading, signIn, signUp, signOut, updateName, updateEmail }}>{children}</Ctx.Provider>;
 }
 export const useAuth = () => useContext(Ctx);

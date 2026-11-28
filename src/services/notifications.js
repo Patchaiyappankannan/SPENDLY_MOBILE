@@ -16,9 +16,12 @@ export async function enableDailyReminder(hour = 21, minute = 0) {
         name: 'Daily reminder', importance: Notifications.AndroidImportance.DEFAULT,
       });
     }
-    await Notifications.cancelAllScheduledNotificationsAsync();
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(scheduled
+      .filter((item) => item.content.data?.kind === 'daily-log')
+      .map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier)));
     await Notifications.scheduleNotificationAsync({
-      content: { title: 'Spendly', body: "Log today's expenses to keep your month on track." },
+      content: { title: 'Spendly', body: "Log today's expenses to keep your month on track.", data: { kind: 'daily-log' } },
       trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute, channelId: 'reminders' },
     });
     return true;
@@ -28,5 +31,10 @@ export async function enableDailyReminder(hour = 21, minute = 0) {
 }
 
 export async function cancelReminders() {
-  try { await Notifications.cancelAllScheduledNotificationsAsync(); } catch {}
+  try {
+    const scheduled = await Notifications.getAllScheduledNotificationsAsync();
+    await Promise.all(scheduled
+      .filter((item) => item.content.data?.kind === 'daily-log')
+      .map((item) => Notifications.cancelScheduledNotificationAsync(item.identifier)));
+  } catch {}
 }

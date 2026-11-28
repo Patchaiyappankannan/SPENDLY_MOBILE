@@ -127,7 +127,7 @@ export default function StatsScreen() {
 
         {type === 'income' ? (
           <>
-            <SectionHeader title="Daily income" />
+            <SectionHeader title="Income received by date" />
             <Card style={{ paddingVertical: 4 }}>
               {daily.length ? daily.map((day) => (
                 <View key={day.date} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: c.border }}>

@@ -5,25 +5,25 @@ import { monthKey, shiftMonth } from '../utils/format';
 
 const now = () => new Date().toISOString();
 
-export async function addTx({ type, amount, category, note, date, incomeFrequency }) {
+export async function addTx({ type, amount, category, note, date, incomeFrequency, recurringId, reminderId, account }) {
   const db = await getDb();
   const userId = getActiveUserId();
   const id = Crypto.randomUUID();
   await db.runAsync(
-    `INSERT INTO transactions (user_id,local_id,type,amount,category,note,date,income_frequency,updated_at,deleted,sync_status)
-     VALUES (?,?,?,?,?,?,?,?,?,0,'pending')`,
-    userId, id, type, amount, category, note || '', date, incomeFrequency, now()
+    `INSERT INTO transactions (user_id,local_id,type,amount,category,note,date,income_frequency,updated_at,deleted,sync_status,recurring_id,reminder_id,account)
+     VALUES (?,?,?,?,?,?,?,?,?,0,'pending',?,?,?)`,
+    userId, id, type, amount, category, note || '', date, incomeFrequency, now(), recurringId || null, reminderId || null, account || ''
   );
   return id;
 }
 
-export async function updateTx(id, { type, amount, category, note, date, incomeFrequency }) {
+export async function updateTx(id, { type, amount, category, note, date, incomeFrequency, recurringId, reminderId, account }) {
   const db = await getDb();
   const userId = getActiveUserId();
   await db.runAsync(
-    `UPDATE transactions SET type=?,amount=?,category=?,note=?,date=?,income_frequency=?,updated_at=?,sync_status='pending'
+    `UPDATE transactions SET type=?,amount=?,category=?,note=?,date=?,income_frequency=?,recurring_id=?,reminder_id=?,account=?,updated_at=?,sync_status='pending'
      WHERE user_id=? AND local_id=?`,
-    type, amount, category, note || '', date, incomeFrequency, now(), userId, id
+    type, amount, category, note || '', date, incomeFrequency, recurringId || null, reminderId || null, account || '', now(), userId, id
   );
 }
 
@@ -94,7 +94,7 @@ export async function exportAll() {
   const db = await getDb();
   const userId = getActiveUserId();
   return db.getAllAsync(
-    'SELECT local_id AS id, type, amount, category, note, date, income_frequency AS incomeFrequency FROM transactions WHERE user_id=? AND deleted=0 ORDER BY date DESC', userId);
+    'SELECT local_id AS id, type, amount, category, note, date, income_frequency AS incomeFrequency, recurring_id AS recurringId, reminder_id AS reminderId, account FROM transactions WHERE user_id=? AND deleted=0 ORDER BY date DESC', userId);
 }
 
 // ----- sync helpers -----
@@ -126,9 +126,10 @@ export async function applyServerTx(rows) {
       const ex = await db.getFirstAsync('SELECT updated_at FROM transactions WHERE user_id=? AND local_id=?', userId, r.clientGuid);
       if (ex && r.updatedAt <= ex.updated_at) continue; // local copy is same or newer
       await db.runAsync(
-        `INSERT OR REPLACE INTO transactions (user_id,local_id,type,amount,category,note,date,income_frequency,updated_at,deleted,sync_status)
-         VALUES (?,?,?,?,?,?,?,?,?,?,'synced')`,
-        userId, r.clientGuid, r.type, r.amount, r.category, r.note || '', r.date, r.incomeFrequency || null, r.updatedAt, r.deleted ? 1 : 0
+        `INSERT OR REPLACE INTO transactions (user_id,local_id,type,amount,category,note,date,income_frequency,updated_at,deleted,sync_status,recurring_id,reminder_id,account,recurring_occurrence,reminder_occurrence)
+         VALUES (?,?,?,?,?,?,?,?,?,?,'synced',?,?,?,?,?)`,
+        userId, r.clientGuid, r.type, r.amount, r.category, r.note || '', r.date, r.incomeFrequency || null,
+        r.updatedAt, r.deleted ? 1 : 0, r.recurringId || null, r.reminderId || null, r.account || '', r.recurringOccurrence || null, r.reminderOccurrence || null
       );
     }
   });

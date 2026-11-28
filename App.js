@@ -7,7 +7,11 @@ import { getDb } from './src/db';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { AuthProvider, useAuth } from './src/context/AuthContext';
 import { SyncProvider } from './src/context/SyncContext';
+import { SecurityProvider, useSecurity } from './src/context/SecurityContext';
 import RootNavigator from './src/navigation/RootNavigator';
+import SetPinScreen from './src/screens/SetPinScreen';
+import UnlockScreen from './src/screens/UnlockScreen';
+import ResetPinScreen from './src/screens/ResetPinScreen';
 
 function BrandSplash() {
   return (
@@ -20,12 +24,22 @@ function BrandSplash() {
 
 function Root() {
   const { c, dark } = useTheme();
-  const { loading } = useAuth();
+  const { loading, user } = useAuth();
+  const security = useSecurity();
+  const [recoveringPin, setRecoveringPin] = useState(false);
+  const expectedUserId = user?.id == null ? null : String(user.id);
+  const securityReady = security.ready && security.userId === expectedUserId;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <StatusBar style={dark ? 'light' : 'dark'} />
-      {loading ? (
+      {loading || !securityReady ? (
         <BrandSplash />
+      ) : user && security.needsPinSetup ? (
+        <SetPinScreen />
+      ) : user && security.locked && recoveringPin ? (
+        <ResetPinScreen onComplete={() => setRecoveringPin(false)} />
+      ) : user && security.locked ? (
+        <UnlockScreen onForgotPin={() => setRecoveringPin(true)} />
       ) : (
         <RootNavigator />
       )}
@@ -55,7 +69,9 @@ export default function App() {
       <ThemeProvider>
         <AuthProvider>
           <SyncProvider>
-            <Root />
+            <SecurityProvider>
+              <Root />
+            </SecurityProvider>
           </SyncProvider>
         </AuthProvider>
       </ThemeProvider>

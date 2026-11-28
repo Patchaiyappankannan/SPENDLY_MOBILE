@@ -9,9 +9,11 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useSync } from '../context/SyncContext';
 import { font, radius, spacing } from '../theme/tokens';
-import { formatMoney, monthKey, daysInMonth } from '../utils/format';
+import { formatMoney, friendlyDate, monthKey, daysInMonth } from '../utils/format';
 import { monthSummary, listByMonth } from '../repositories/txRepo';
 import { getBudget } from '../repositories/budgetRepo';
+import { getUpcomingReminderCount } from '../repositories/reminderRepo';
+import { getSavingsSummary } from '../repositories/savingsRepo';
 
 export default function HomeScreen({ navigation }) {
   const { c, currency } = useTheme();
@@ -22,11 +24,15 @@ export default function HomeScreen({ navigation }) {
   const [sum, setSum] = useState({ income: 0, expense: 0 });
   const [budget, setBudget] = useState(null);
   const [recent, setRecent] = useState([]);
+  const [dueReminders, setDueReminders] = useState([]);
+  const [savings, setSavings] = useState({ totalSaved: 0, topGoal: null });
 
   const load = useCallback(async () => {
     setSum(await monthSummary(month, date));
     setBudget(await getBudget(month));
     setRecent((await listByMonth(month, { date })).slice(0, 6));
+    setDueReminders(await getUpcomingReminderCount());
+    setSavings(await getSavingsSummary());
   }, [month, date]);
 
   useFocusEffect(useCallback(() => { load(); }, [load, version]));
@@ -108,6 +114,42 @@ export default function HomeScreen({ navigation }) {
               <Ionicons name="chevron-forward" size={18} color={c.textMuted} />
             </Pressable>
           )}
+        </Card>
+
+        <Card style={{ marginTop: spacing.md }}>
+          <Pressable onPress={() => navigation.navigate('Goals')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="flag-outline" size={19} color={c.income} /><Text style={{ color: c.text, fontSize: font.md, fontWeight: '700' }}>Savings goals</Text></View>
+            <Text style={{ color: c.primary, fontSize: font.sm, fontWeight: '700' }}>Open  ›</Text>
+          </Pressable>
+          <Text style={{ color: c.text, fontSize: font.lg, fontWeight: '800', marginTop: 8 }}>{formatMoney(savings.totalSaved, currency)} saved</Text>
+          {savings.topGoal ? <>
+            <Muted style={{ marginTop: 2 }}>Leading: {savings.topGoal.name}</Muted>
+            <View style={{ marginTop: 8 }}><ProgressBar pct={Math.min(100, Number(savings.topGoal.saved_amount) / Number(savings.topGoal.target_amount) * 100)} color={savings.topGoal.color || c.primary} height={6} /></View>
+          </> : <Muted style={{ marginTop: 2 }}>Start a savings goal</Muted>}
+        </Card>
+
+        <Card style={{ marginTop: spacing.md }}>
+          <Pressable onPress={() => navigation.navigate('LendBorrow')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><Ionicons name="people-outline" size={19} color={c.accent} /><Text style={{ color: c.text, fontSize: font.md, fontWeight: '700' }}>Split, lend & borrow</Text></View>
+            <Text style={{ color: c.primary, fontSize: font.sm, fontWeight: '700' }}>Open  ›</Text>
+          </Pressable>
+        </Card>
+
+        <Card style={{ marginTop: spacing.md }}>
+          <Pressable onPress={() => navigation.navigate('Reminders')} style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: dueReminders.length ? spacing.sm : 0 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Ionicons name="notifications-outline" size={19} color={c.accent} />
+              <Text style={{ color: c.text, fontSize: font.md, fontWeight: '700' }}>Due in the next 7 days</Text>
+            </View>
+            <Text style={{ color: c.primary, fontSize: font.sm, fontWeight: '700' }}>{dueReminders.length}  ›</Text>
+          </Pressable>
+          {dueReminders.slice(0, 3).map((reminder) => (
+            <Pressable key={reminder.id} onPress={() => navigation.navigate('AddReminder', { id: reminder.id })}
+              style={{ flexDirection: 'row', justifyContent: 'space-between', borderTopWidth: 1, borderTopColor: c.border, paddingVertical: 9 }}>
+              <Text numberOfLines={1} style={{ color: c.text, flex: 1 }}>{reminder.title} · {friendlyDate(reminder.due_date)}</Text>
+              {reminder.amount != null ? <Text style={{ color: c.textMuted, marginLeft: 8 }}>{formatMoney(reminder.amount, currency)}</Text> : null}
+            </Pressable>
+          ))}
         </Card>
 
         <SectionHeader title="Recent" action={recent.length ? 'See all' : undefined} onAction={() => navigation.navigate('Transactions')} />

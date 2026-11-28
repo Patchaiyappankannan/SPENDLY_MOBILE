@@ -7,6 +7,13 @@ import { pendingTxCount } from '../repositories/txRepo';
 import { pendingBudgetCount } from '../repositories/budgetRepo';
 import { getSetting } from '../repositories/settingsRepo';
 import { syncPendingProfilePhoto } from '../services/profilePhoto';
+import { generateDueExpenses } from '../repositories/recurringRepo';
+import { rescheduleAllReminders } from '../repositories/reminderRepo';
+import { registerRecurringBackgroundTask } from '../services/backgroundTasks';
+import { pendingSavingsCount } from '../repositories/savingsRepo';
+import { pendingLendBorrowCount } from '../repositories/lendBorrowRepo';
+import { rescheduleModuleNotifications } from '../services/moduleNotifications';
+import { pendingPreferencesCount } from '../repositories/preferencesRepo';
 
 const Ctx = createContext(null);
 
@@ -20,7 +27,7 @@ export function SyncProvider({ children }) {
   const busy = useRef(false);
 
   const refresh = useCallback(async () => {
-    setPending((await pendingTxCount()) + (await pendingBudgetCount()));
+    setPending((await pendingTxCount()) + (await pendingBudgetCount()) + (await pendingSavingsCount()) + (await pendingLendBorrowCount()) + (await pendingPreferencesCount()));
     setLastSync(await getSetting('last_sync', ''));
   }, []);
 
@@ -30,6 +37,7 @@ export function SyncProvider({ children }) {
     setSyncing(true);
     const r = await syncNow();
     await syncPendingProfilePhoto();
+    await rescheduleModuleNotifications();
     setSyncing(false);
     busy.current = false;
     if (r.error) setError(r.status === 401 ? 'Session expired. Sign out and sign in again.' : r.error);
@@ -39,6 +47,14 @@ export function SyncProvider({ children }) {
     return r;
   }, [user, refresh]);
 
+  const maintainLocalSchedules = useCallback(async () => {
+    if (!user) return;
+    const generated = await generateDueExpenses();
+    await rescheduleAllReminders();
+    await rescheduleModuleNotifications();
+    if (generated) setVersion((v) => v + 1);
+  }, [user]);
+
   // Call after any local write: updates the badge and tries to sync right away.
   const changed = useCallback(async () => {
     setVersion((v) => v + 1);
@@ -46,14 +62,21 @@ export function SyncProvider({ children }) {
     run();
   }, [refresh, run]);
 
-  useEffect(() => { if (user) { refresh(); run(); } }, [user]);
+  useEffect(() => {
+    if (!user) return;
+    refresh();
+    registerRecurringBackgroundTask().catch(() => {});
+    maintainLocalSchedules().then(run).catch(() => {});
+  }, [user, maintainLocalSchedules, run]);
 
   useEffect(() => {
     if (!user) return;
     const unsub = NetInfo.addEventListener((s) => { if (s.isConnected) run(); });
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') run(); });
+    const sub = AppState.addEventListener('change', (s) => {
+      if (s === 'active') maintainLocalSchedules().then(run).catch(() => {});
+    });
     return () => { unsub(); sub.remove(); };
-  }, [user, run]);
+  }, [user, run, maintainLocalSchedules]);
 
   return (
     <Ctx.Provider value={{ pending, syncing, lastSync, error, version, changed, syncNow: run }}>

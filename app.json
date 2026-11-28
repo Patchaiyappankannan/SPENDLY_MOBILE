@@ -14,7 +14,10 @@
       }
     },
     "ios": {
-      "bundleIdentifier": "com.patchaiyappan.spendly"
+      "bundleIdentifier": "com.patchaiyappan.spendly",
+      "infoPlist": {
+        "UIBackgroundModes": ["fetch"]
+      }
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -23,6 +26,12 @@
       "expo-sqlite",
       "expo-secure-store",
       "expo-notifications",
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Allow Spendly to use Face ID to unlock the app."
+        }
+      ],
       [
         "expo-splash-screen",
         {
@@ -37,8 +46,14 @@
         "expo-image-picker",
         {
           "cameraPermission": "Allow Spendly to use your camera for your profile photo.",
-          "photosPermission": "Allow Spendly to access your photos for your profile photo.",
+          "photosPermission": "Allow Spendly to access photos for profile images and transaction proof.",
           "microphonePermission": false
+        }
+      ],
+      [
+        "expo-contacts",
+        {
+          "contactsPermission": "Allow Spendly to access contacts when you choose a person to track."
         }
       ],
       "expo-build-properties"

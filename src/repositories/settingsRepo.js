@@ -2,7 +2,7 @@ import { getDb } from '../db';
 import { getActiveUserId } from '../services/activeUser';
 
 const USER_SETTINGS = new Set([
-  'last_pull', 'last_sync', 'reminder_on', 'reminder_hour', 'reminder_minute',
+  'last_pull', 'last_sync', 'last_recurring_pull', 'last_reminders_pull', 'last_goals_pull', 'last_lendborrow_pull', 'last_preferences_pull', 'reminder_on', 'reminder_hour', 'reminder_minute',
   'profile_photo_data', 'profile_photo_mime', 'profile_photo_pending',
 ]);
 

@@ -48,5 +48,11 @@ export async function resetLocalData() {
   if (!userId) return;
   await db.runAsync('DELETE FROM transactions WHERE user_id=?', userId);
   await db.runAsync('DELETE FROM budgets WHERE user_id=?', userId);
+  await db.runAsync('DELETE FROM recurring_expenses WHERE user_id=?', userId);
+  await db.runAsync('DELETE FROM reminders WHERE user_id=?', userId);
+  await db.runAsync('DELETE FROM lend_borrow_entries WHERE user_id=?', userId);
+  await db.runAsync('DELETE FROM goal_contributions WHERE user_id=?', userId);
+  await db.runAsync('DELETE FROM persons WHERE user_id=?', userId);
+  await db.runAsync('DELETE FROM savings_goals WHERE user_id=?', userId);
   await db.runAsync('DELETE FROM user_meta WHERE user_id=?', userId);
 }

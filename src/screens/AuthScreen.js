@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { View, Text, Image, KeyboardAvoidingView, Platform, ScrollView } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Image, KeyboardAvoidingView, Platform, ScrollView, Pressable } from 'react-native';
 import { Screen, Input, Button, Muted } from '../components/ui';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { font, radius } from '../theme/tokens';
 
-export default function AuthScreen() {
+export default function AuthScreen({ navigation, route }) {
   const { c } = useTheme();
   const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState('login');
@@ -14,8 +14,15 @@ export default function AuthScreen() {
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [error, setError] = useState('');
+  const [notice, setNotice] = useState('');
   const [busy, setBusy] = useState(false);
   const register = mode === 'register';
+
+  useEffect(() => {
+    if (!route.params?.successMessage) return;
+    setNotice(route.params.successMessage);
+    navigation.setParams({ successMessage: undefined });
+  }, [navigation, route.params?.successMessage]);
 
   const submit = async () => {
     setError('');
@@ -54,8 +61,12 @@ export default function AuthScreen() {
             rightIconLabel={passwordVisible ? 'Hide password' : 'Show password'}
             onRightIconPress={() => setPasswordVisible((visible) => !visible)} />
 
+          {notice ? <Text style={{ color: c.income, fontSize: font.sm, marginBottom: 12 }}>{notice}</Text> : null}
           {error ? <Text style={{ color: c.expense, fontSize: font.sm, marginBottom: 12 }}>{error}</Text> : null}
           <Button title={register ? 'Create account' : 'Sign in'} onPress={submit} loading={busy} />
+          {!register ? <Pressable onPress={() => navigation.navigate('ForgotPassword')} style={{ alignSelf: 'center', padding: 12 }}>
+            <Text style={{ color: c.primary, fontSize: font.sm, fontWeight: '600' }}>Forgot password?</Text>
+          </Pressable> : null}
           <Button
             title={register ? 'I already have an account' : 'Create a new account'}
             variant="ghost" style={{ marginTop: 8 }}

@@ -12,14 +12,14 @@ import { useSync } from '../context/SyncContext';
 import { font, radius, spacing } from '../theme/tokens';
 import { monthKey, timeAgo } from '../utils/format';
 import { getBudget, setBudget } from '../repositories/budgetRepo';
-import { getSetting, setSetting } from '../repositories/settingsRepo';
+import { getUserPreferences, updateUserPreferences } from '../repositories/preferencesRepo';
 import { exportAll } from '../repositories/txRepo';
 import { enableDailyReminder, cancelReminders } from '../services/notifications';
 import { getLocalProfilePhoto, saveProfilePhoto, syncProfilePhoto } from '../services/profilePhoto';
 
 const CURRENCIES = ['₹', '$', '€', '£'];
 
-export default function SettingsScreen() {
+export default function SettingsScreen({ navigation }) {
   const { c, mode, setMode, currency, setCurrency } = useTheme();
   const { user, signOut, updateName } = useAuth();
   const { pending, syncing, lastSync, error, syncNow, changed } = useSync();
@@ -35,11 +35,12 @@ export default function SettingsScreen() {
 
   useEffect(() => {
     (async () => {
-      setRemind((await getSetting('reminder_on', '0')) === '1');
-      setHour(Number(await getSetting('reminder_hour', '21')));
-      setMinute(Number(await getSetting('reminder_minute', '0')));
+      const preferences = await getUserPreferences(user?.id);
+      setRemind(preferences.dailyReminderEnabled);
+      setHour(preferences.dailyReminderHour);
+      setMinute(preferences.dailyReminderMinute);
     })();
-  }, []);
+  }, [user?.id]);
 
   useEffect(() => {
     let active = true;
@@ -133,7 +134,8 @@ export default function SettingsScreen() {
       if (!ok) return Alert.alert('Notifications are off', 'Allow notifications for Spendly in your phone settings.');
     } else await cancelReminders();
     setRemind(on);
-    await setSetting('reminder_on', on ? '1' : '0');
+    await updateUserPreferences({ dailyReminderEnabled: on }, user.id);
+    changed();
   };
 
   const pickReminderTime = async (event, selectedTime) => {
@@ -144,8 +146,8 @@ export default function SettingsScreen() {
     const nextMinute = selectedTime.getMinutes();
     setHour(nextHour);
     setMinute(nextMinute);
-    await setSetting('reminder_hour', nextHour);
-    await setSetting('reminder_minute', nextMinute);
+    await updateUserPreferences({ dailyReminderHour: nextHour, dailyReminderMinute: nextMinute }, user.id);
+    changed();
     if (remind) {
       const ok = await enableDailyReminder(nextHour, nextMinute);
       if (!ok) Alert.alert('Reminder not updated', 'Allow notifications for Spendly in your phone settings.');
@@ -199,6 +201,7 @@ export default function SettingsScreen() {
         <Card>
           <Input label="Display name" value={name} onChangeText={setName} icon="person-outline" containerStyle={{ marginBottom: spacing.md }} />
           <Button title="Save name" variant="secondary" onPress={saveName} />
+          <Button title="Change email" icon="mail-outline" variant="secondary" onPress={() => navigation.navigate('ChangeEmail')} style={{ marginTop: 10 }} />
           <Button title={profilePhoto ? 'Change profile photo' : 'Upload profile photo'} icon="image-outline"
             variant="secondary" onPress={chooseProfilePhoto} loading={photoBusy} style={{ marginTop: 10 }} />
         </Card>
@@ -220,6 +223,17 @@ export default function SettingsScreen() {
           <Muted style={{ fontWeight: '600', marginBottom: 8 }}>Appearance</Muted>
           <Segmented value={mode} onChange={setMode}
             options={[{ key: 'system', label: 'System' }, { key: 'light', label: 'Light' }, { key: 'dark', label: 'Dark' }]} />
+        </Card>
+
+        <SectionHeader title="Planning" />
+        <Card>
+          <Button title="Recurring expenses" icon="repeat" variant="secondary" onPress={() => navigation.navigate('Recurring')} />
+          <Button title="Bill reminders" icon="notifications-outline" variant="secondary" onPress={() => navigation.navigate('Reminders')} style={{ marginTop: 10 }} />
+        </Card>
+
+        <SectionHeader title="Security" />
+        <Card>
+          <Button title="App PIN and biometrics" icon="shield-checkmark-outline" variant="secondary" onPress={() => navigation.navigate('SecuritySettings')} />
         </Card>
 
         <SectionHeader title="Daily reminder" />
